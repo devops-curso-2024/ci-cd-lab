@@ -1,32 +1,45 @@
 pipeline {
     agent any
     environment {
-        REPO_URL = 'https://github.com/devops-curso-2024/ci-cd-lab.git'  // URL del repositorio de GitHub
+        REPO_URL = 'https://github.com/devops-curso-2024/ci-cd-lab.git'
         IMAGE_NAME = 'my-flask-app'
     }
     stages {
         stage('Checkout') {
             steps {
-                git url: "${env.REPO_URL}", branch: 'main'  // Clona el repositorio desde GitHub
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: "${env.REPO_URL}"]]])
             }
         }
         stage('Build') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'  // Construye la imagen Docker
+                script {
+                    def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${imageTag} ."
+                }
             }
         }
         stage('Run') {
             steps {
                 script {
-                    // Verifica si el contenedor existe
-                    def containerExists = sh(script: "docker ps -a --filter name=${IMAGE_NAME} --format '{{.Names}}'", returnStdout: true).trim()
-                    if (containerExists) {
-                        // Detiene y elimina el contenedor si existe
-                        sh "docker stop ${IMAGE_NAME}"
-                        sh "docker rm ${IMAGE_NAME}"
+                    def containerId = sh(script: "docker ps -aqf 'name=${env.IMAGE_NAME}'", returnStdout: true).trim()
+                    if (containerId) {
+                        sh "docker stop ${containerId}"
+                        sh "docker rm ${containerId}"
                     }
-                    // Ejecuta un nuevo contenedor
-                    sh "docker run -d --name ${IMAGE_NAME} -p 5000:5000 ${IMAGE_NAME}:${BUILD_NUMBER}"
+                    def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    sh "docker run -d --name ${env.IMAGE_NAME} -p 5000:5000 ${imageTag}"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                def runningContainer = sh(script: "docker ps -qf 'name=${env.IMAGE_NAME}'", returnStdout: true).trim()
+                if (runningContainer) {
+                    echo "Container ${env.IMAGE_NAME} is running."
+                } else {
+                    echo "Container ${env.IMAGE_NAME} is not running."
                 }
             }
         }
