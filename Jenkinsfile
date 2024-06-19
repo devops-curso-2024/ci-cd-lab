@@ -12,18 +12,21 @@ pipeline {
         }
         stage('Build') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} .'  // Construye la imagen Docker
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'  // Construye la imagen Docker
             }
         }
         stage('Run') {
             steps {
                 script {
+                    // Verifica si el contenedor existe
                     def containerExists = sh(script: "docker ps -a --filter name=${IMAGE_NAME} --format '{{.Names}}'", returnStdout: true).trim()
                     if (containerExists) {
+                        // Detiene y elimina el contenedor si existe
                         sh "docker stop ${IMAGE_NAME}"
                         sh "docker rm ${IMAGE_NAME}"
                     }
-                    sh "docker run -d --name ${IMAGE_NAME} -p 5000:5000 ${IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    // Ejecuta un nuevo contenedor
+                    sh "docker run -d --name ${IMAGE_NAME} -p 5000:5000 ${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
