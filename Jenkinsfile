@@ -7,13 +7,17 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: "${env.REPO_URL}"]]])
+                script {
+                    echo "Clonando el repositorio"
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: "${env.REPO_URL}"]]])
+                }
             }
         }
         stage('Build') {
             steps {
                 script {
                     def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    echo "Construyendo la imagen Docker ${imageTag}"
                     sh "docker build -t ${imageTag} ."
                 }
             }
@@ -23,10 +27,12 @@ pipeline {
                 script {
                     def containerId = sh(script: "docker ps -aqf 'name=${env.IMAGE_NAME}'", returnStdout: true).trim()
                     if (containerId) {
+                        echo "Deteniendo y eliminando el contenedor existente ${containerId}"
                         sh "docker stop ${containerId}"
                         sh "docker rm ${containerId}"
                     }
                     def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    echo "Ejecutando un nuevo contenedor ${imageTag}"
                     sh "docker run -d --name ${env.IMAGE_NAME} -p 5000:5000 ${imageTag}"
                 }
             }
@@ -37,9 +43,9 @@ pipeline {
             script {
                 def runningContainer = sh(script: "docker ps -qf 'name=${env.IMAGE_NAME}'", returnStdout: true).trim()
                 if (runningContainer) {
-                    echo "Container ${env.IMAGE_NAME} is running."
+                    echo "El contenedor ${env.IMAGE_NAME} está en ejecución."
                 } else {
-                    echo "Container ${env.IMAGE_NAME} is not running."
+                    echo "El contenedor ${env.IMAGE_NAME} no está en ejecución."
                 }
             }
         }
